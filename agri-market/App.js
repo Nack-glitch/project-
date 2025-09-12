@@ -1,4 +1,4 @@
-// App.js
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -31,7 +31,7 @@ function AppContent() {
   const [isSplashVisible, setSplashVisible] = useState(true);
 
   useEffect(() => {
-    // Hide splash screen after 2 seconds
+
     const timer = setTimeout(() => setSplashVisible(false), 2000);
     return () => clearTimeout(timer);
   }, []);
@@ -91,10 +91,8 @@ function AppContent() {
         )}
       </View>
 
-      {/* Main Content */}
       <ScrollView style={{ flex: 1 }}>{renderCurrentView()}</ScrollView>
 
-      {/* Bottom Navigation */}
       <SafeAreaView edges={["bottom"]} style={styles.bottomNav}>
         <TouchableOpacity
           style={[styles.navButton, currentView === "home" && styles.navButtonActive]}
@@ -120,15 +118,13 @@ function AppContent() {
           <Text style={styles.navLabel}>{user ? "Dashboard" : "Profile"}</Text>
         </TouchableOpacity>
       </SafeAreaView>
-
-      {/* Auth Modal */}
+      
       <Modal visible={showAuthModal} animationType="slide" transparent>
         <AuthScreen
           onClose={() => setShowAuthModal(false)}
-          onNavigate={() => {
-            // Automatically go to dashboard after successful login/register
+          onNavigate={(view) => {
             setShowAuthModal(false);
-            setCurrentView("dashboard");
+            setCurrentView(view);
           }}
         />
       </Modal>

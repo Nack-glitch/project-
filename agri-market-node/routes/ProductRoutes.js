@@ -1,15 +1,24 @@
-// routes/productRoutes.js
 import express from "express";
 import { addProduct, getProducts } from "../controllers/productController.js";
-import { protect, farmerOnly } from "../middleware/authMiddleware.js";
-import upload from "../middleware/uploadMiddleware.js";
+import multer from "multer";
+import path from "path";
 
 const router = express.Router();
 
-// Fetch all products (no auth needed)
-router.get("/", getProducts);
+// Multer config
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); // folder to store uploaded images
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + path.extname(file.originalname);
+    cb(null, uniqueSuffix);
+  },
+});
+const upload = multer({ storage });
 
-// Add product (farmer only)
-router.post("/", protect, farmerOnly, upload.single("imageUrl"), addProduct);
+// Routes
+router.post("/", upload.single("imageUrl"), addProduct);
+router.get("/", getProducts);
 
 export default router;

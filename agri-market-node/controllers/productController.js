@@ -1,13 +1,15 @@
-// controllers/productController.js
-import Product from "../models/productModels.js";
+import Product from "../models/ProductModel.js";
+import path from "path";
 
+// Add Product
 export const addProduct = async (req, res) => {
   try {
-    const { name, description, quantity, price } = req.body;
+    const { name, description, quantity, price, category, farmer } = req.body;
 
-    // Only farmer can add product
-    if (!req.user || req.user.role !== "farmer") {
-      return res.status(403).json({ message: "Only farmers can add products" });
+    let imageUrl = "";
+    if (req.file) {
+      // Generate full URL
+      imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
     }
 
     const product = new Product({
@@ -15,27 +17,15 @@ export const addProduct = async (req, res) => {
       description,
       quantity,
       price,
-      farmer: req.user._id,
-      imageUrl: req.file ? `/uploads/${req.file.filename}` : "",
+      farmer,
+      category,
+      imageUrl,
     });
 
-    const savedProduct = await product.save();
-    await savedProduct.populate("farmer", "name farmName");
-
-    res.status(201).json(savedProduct);
+    await product.save();
+    res.status(201).json(product);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Failed to add product" });
-  }
-};
-
-// Get all products
-export const getProducts = async (req, res) => {
-  try {
-    const products = await Product.find().populate("farmer", "name farmName");
-    res.json(products);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Failed to fetch products" });
   }
 };

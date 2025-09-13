@@ -8,6 +8,7 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
@@ -68,13 +69,14 @@ const DashboardScreen = ({ onNavigate }) => {
   }, []);
 
   useEffect(() => {
-    fetchTransactions();
+    if (user) fetchTransactions();
     fetchCategories();
-  }, [fetchTransactions, fetchCategories]);
+  }, [fetchTransactions, fetchCategories, user]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchTransactions();
+    if (user) fetchTransactions();
+    fetchCategories();
   };
 
   const pickImage = async () => {
@@ -86,6 +88,8 @@ const DashboardScreen = ({ onNavigate }) => {
   };
 
   const handleAddProduct = async () => {
+    if (!user || user.role !== "farmer") return;
+
     if (!name || !quantity || !price || !category) {
       return showMessage("Please fill all fields and select a category", "error");
     }
@@ -97,12 +101,20 @@ const DashboardScreen = ({ onNavigate }) => {
     formData.append("price", price);
     formData.append("category", category);
     formData.append("farmer", user._id);
+
     if (image) {
-      formData.append("imageUrl", { uri: image, name: "product.jpg", type: "image/jpeg" });
+      const localUri = image.startsWith("file://") ? image : "file://" + image;
+      formData.append("imageUrl", {
+        uri: localUri,
+        name: "product.jpg",
+        type: "image/jpeg",
+      });
     }
 
     try {
-      const config = { headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "multipart/form-data" } };
+      const config = {
+        headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "multipart/form-data" },
+      };
       await axios.post(API_URL + "/products", formData, config);
       showMessage("Product added successfully", "success");
 
@@ -117,23 +129,28 @@ const DashboardScreen = ({ onNavigate }) => {
   const renderTransaction = ({ item }) => {
     const farmerName = item.farmer?.name || "Unknown Farmer";
     const clientName = item.client?.name || "Unknown Client";
-
-    const statusText = user.role === "client"
+    const statusText = user?.role === "client"
       ? `Bought from ${farmerName}`
       : `Sold to ${clientName}`;
 
+    // Display image from backend correctly
+    const imageUri = item.product?.imageUrl
+      ? item.product.imageUrl.startsWith("http") 
+        ? item.product.imageUrl
+        : `http://192.168.8.123:5000${item.product.imageUrl}`
+      : null;
+
     return (
       <View style={styles.item}>
-        <Text style={styles.productText}>Product: {item.product?.name}</Text>
-        <Text>
-          Quantity: {item.quantity} {item.product?.unit || ""}
-        </Text>
-        <Text>
-          Price: {item.product?.price} ETB
-        </Text>
-        <Text>
-          Total: {item.totalAmount} ETB
-        </Text>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.productImage} />
+        ) : (
+          <Text style={{ marginBottom: 5 }}>No image</Text>
+        )}
+        <Text style={styles.productText}>Product: {item.product?.name || "N/A"}</Text>
+        <Text>Quantity: {item.quantity} {item.product?.unit || ""}</Text>
+        <Text>Price: {item.product?.price || 0} ETB</Text>
+        <Text>Total: {item.totalAmount || 0} ETB</Text>
         <Text style={styles.status}>{statusText}</Text>
       </View>
     );
@@ -145,10 +162,7 @@ const DashboardScreen = ({ onNavigate }) => {
     <View style={{ flex: 1 }}>
       <View style={styles.messageContainer}>
         {messages.map((msg) => (
-          <View
-            key={msg.id}
-            style={[styles.message, { backgroundColor: msg.type === "error" ? "#f87171" : "#34d399" }]}
-          >
+          <View key={msg.id} style={[styles.message, { backgroundColor: msg.type === "error" ? "#f87171" : "#34d399" }]}>
             <Text style={styles.messageText}>{msg.text}</Text>
           </View>
         ))}
@@ -164,22 +178,21 @@ const DashboardScreen = ({ onNavigate }) => {
         ListHeaderComponent={
           <>
             <View style={styles.header}>
-              <Text style={styles.welcome}>Welcome, {user?.name}</Text>
-              <TouchableOpacity style={styles.logoutBtn} onPress={() => {
-                logout();
-                if(onNavigate) onNavigate("auth"); 
-              }}>
-                <Text style={styles.logoutText}>Logout</Text>
-              </TouchableOpacity>
+              <Text style={styles.welcome}>Welcome, {user?.name || "Guest"}</Text>
+              {user && (
+                <TouchableOpacity style={styles.logoutBtn} onPress={() => { logout(); onNavigate?.("auth"); }}>
+                  <Text style={styles.logoutText}>Logout</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
-            {user.role === "farmer" && (
+            {user?.role === "farmer" && (
               <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddForm(!showAddForm)}>
                 <Text style={styles.addBtnText}>{showAddForm ? "Cancel" : "+ Add Product"}</Text>
               </TouchableOpacity>
             )}
 
-            {showAddForm && user.role === "farmer" && (
+            {showAddForm && user?.role === "farmer" && (
               <View style={styles.form}>
                 <TextInput style={styles.input} placeholder="Product Name" value={name} onChangeText={setName} />
                 <TextInput style={styles.input} placeholder="Description" value={description} onChangeText={setDescription} />
@@ -236,6 +249,7 @@ const styles = StyleSheet.create({
   messageContainer: { paddingHorizontal: 20, marginBottom: 10 },
   message: { padding: 10, borderRadius: 8, marginBottom: 5 },
   messageText: { color: "#fff", fontWeight: "bold" },
+  productImage: { width: 100, height: 100, borderRadius: 8, marginBottom: 5 },
 });
 
 export default DashboardScreen;

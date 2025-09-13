@@ -1,4 +1,3 @@
-// middleware/upload.js
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -23,18 +22,14 @@ const storage = multer.diskStorage({
 // File filter
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ["image/jpeg", "image/png", "image/jpg"];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only .jpg, .jpeg, .png files are allowed"), false);
-  }
+  if (allowedTypes.includes(file.mimetype)) cb(null, true);
+  else cb(new Error("Only .jpg, .jpeg, .png files are allowed"), false);
 };
 
-// Multer instance
-const upload = multer({ 
-  storage, 
-  fileFilter, 
-  limits: { fileSize: 5 * 1024 * 1024 } // optional: 5MB max
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
 });
 
 export default upload;

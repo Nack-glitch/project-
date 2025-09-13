@@ -6,8 +6,6 @@ import {
   TouchableOpacity,
   FlatList,
   TextInput,
-  Alert,
-  ScrollView,
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
@@ -18,8 +16,9 @@ import { Picker } from "@react-native-picker/picker";
 
 const API_URL = "http://192.168.8.123:5000/api";
 
-const DashboardScreen = ({ navigation }) => {
+const DashboardScreen = ({ onNavigate }) => {
   const { user, logout } = useAuth();
+
   const [transactions, setTransactions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,26 +32,30 @@ const DashboardScreen = ({ navigation }) => {
   const [image, setImage] = useState(null);
   const [category, setCategory] = useState("");
 
+  const [messages, setMessages] = useState([]);
+
+  const showMessage = (text, type = "info") => {
+    const id = Date.now();
+    setMessages((prev) => [...prev, { id, text, type }]);
+    setTimeout(() => setMessages((prev) => prev.filter((msg) => msg.id !== id)), 5000);
+  };
+
   const fetchTransactions = useCallback(async () => {
     if (!user) return;
     try {
       const config = { headers: { Authorization: `Bearer ${user.token}` } };
       const endpoint = user.role === "farmer" ? "/transactions/farmer" : "/transactions/client";
       const res = await axios.get(API_URL + endpoint, config);
-      setTransactions(res.data);
+      const sorted = res.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setTransactions(sorted);
     } catch (error) {
       console.error(error.response?.data || error.message);
-      if (error.response?.status === 401) {
-        Alert.alert("Unauthorized", "Please login again");
-        logout();
-        navigation.replace("Auth");
-      }
+      showMessage("Failed to fetch transactions", "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [user]);
-
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -60,6 +63,7 @@ const DashboardScreen = ({ navigation }) => {
       setCategories(res.data);
     } catch (error) {
       console.error("Failed to fetch categories:", error.response?.data || error.message);
+      showMessage("Failed to fetch categories", "error");
     }
   }, []);
 
@@ -81,10 +85,9 @@ const DashboardScreen = ({ navigation }) => {
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
-
   const handleAddProduct = async () => {
     if (!name || !quantity || !price || !category) {
-      return Alert.alert("Error", "Please fill all fields and select a category");
+      return showMessage("Please fill all fields and select a category", "error");
     }
 
     const formData = new FormData();
@@ -95,172 +98,144 @@ const DashboardScreen = ({ navigation }) => {
     formData.append("category", category);
     formData.append("farmer", user._id);
     if (image) {
-      formData.append("imageUrl", {
-        uri: image,
-        name: "product.jpg",
-        type: "image/jpeg",
-      });
+      formData.append("imageUrl", { uri: image, name: "product.jpg", type: "image/jpeg" });
     }
 
     try {
-      const config = {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      };
+      const config = { headers: { Authorization: `Bearer ${user.token}`, "Content-Type": "multipart/form-data" } };
       await axios.post(API_URL + "/products", formData, config);
-      Alert.alert("Success", "Product added successfully");
+      showMessage("Product added successfully", "success");
 
-      setName("");
-      setDescription("");
-      setQuantity("");
-      setPrice("");
-      setImage(null);
-      setCategory("");
-      setShowAddForm(false);
-
+      setName(""); setDescription(""); setQuantity(""); setPrice(""); setImage(null); setCategory(""); setShowAddForm(false);
       fetchTransactions();
     } catch (error) {
       console.error(error.response?.data || error.message);
-      Alert.alert("Error", "Failed to add product");
+      showMessage("Failed to add product", "error");
     }
   };
 
+  const renderTransaction = ({ item }) => {
+    const farmerName = item.farmer?.name || "Unknown Farmer";
+    const clientName = item.client?.name || "Unknown Client";
 
-  const handleBuyProduct = async (productId) => {
-    try {
-      if (!user || user.role !== "client") {
-        return Alert.alert("Unauthorized", "Only clients can buy products");
-      }
+    const statusText = user.role === "client"
+      ? `Bought from ${farmerName}`
+      : `Sold to ${clientName}`;
 
-      const res = await axios.post(
-        `${API_URL}/transactions/buy`,
-        { productId },
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-
-      Alert.alert("Success", `You bought ${res.data.quantity || 1} of ${res.data.product.name}`);
-      fetchTransactions();
-    } catch (error) {
-      console.error(error.response?.data || error.message);
-      Alert.alert("Error", error.response?.data?.message || "Failed to buy product");
-    }
+    return (
+      <View style={styles.item}>
+        <Text style={styles.productText}>Product: {item.product?.name}</Text>
+        <Text>
+          Quantity: {item.quantity} {item.product?.unit || ""}
+        </Text>
+        <Text>
+          Price: {item.product?.price} ETB
+        </Text>
+        <Text>
+          Total: {item.totalAmount} ETB
+        </Text>
+        <Text style={styles.status}>{statusText}</Text>
+      </View>
+    );
   };
+
+  if (loading) return <View style={styles.centered}><ActivityIndicator size="large" color="#16a34a" /></View>;
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.welcome}>Welcome, {user?.name}</Text>
-          {user.role === "farmer" && user.farmName && <Text>{user.farmName}</Text>}
-        </View>
-        <TouchableOpacity
-          style={styles.logoutBtn}
-          onPress={() => {
-            logout();
-            navigation.replace("Auth");
-          }}
-        >
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+    <View style={{ flex: 1 }}>
+      <View style={styles.messageContainer}>
+        {messages.map((msg) => (
+          <View
+            key={msg.id}
+            style={[styles.message, { backgroundColor: msg.type === "error" ? "#f87171" : "#34d399" }]}
+          >
+            <Text style={styles.messageText}>{msg.text}</Text>
+          </View>
+        ))}
       </View>
 
-      {/* Farmer Add Product Form */}
-      {user.role === "farmer" && (
-        <View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddForm(!showAddForm)}>
-            <Text style={styles.addBtnText}>{showAddForm ? "Cancel" : "+ Add Product"}</Text>
-          </TouchableOpacity>
-
-          {showAddForm && (
-            <View style={styles.form}>
-              <TextInput style={styles.input} placeholder="Product Name" value={name} onChangeText={setName} />
-              <TextInput style={styles.input} placeholder="Description" value={description} onChangeText={setDescription} />
-              <TextInput style={styles.input} placeholder="Quantity" value={quantity} onChangeText={setQuantity} keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="Price (ETB)" value={price} onChangeText={setPrice} keyboardType="numeric" />
-
-              <View style={styles.pickerContainer}>
-                <Picker selectedValue={category} onValueChange={(itemValue) => setCategory(itemValue)}>
-                  <Picker.Item label="Select Category" value="" />
-                  {categories.map((cat) => (
-                    <Picker.Item key={cat._id} label={cat.name} value={cat._id} />
-                  ))}
-                </Picker>
-              </View>
-
-              <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
-                <Text style={styles.imageBtnText}>{image ? "Change Image" : "Pick Image"}</Text>
-              </TouchableOpacity>
-              {image && <Text>Image selected</Text>}
-
-              <TouchableOpacity style={styles.submitBtn} onPress={handleAddProduct}>
-                <Text style={styles.submitBtnText}>Add Product</Text>
+      <FlatList
+        data={transactions}
+        keyExtractor={(item) => item._id}
+        renderItem={renderTransaction}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={{ paddingBottom: 50 }}
+        ListEmptyComponent={<Text style={styles.noData}>No transactions found.</Text>}
+        ListHeaderComponent={
+          <>
+            <View style={styles.header}>
+              <Text style={styles.welcome}>Welcome, {user?.name}</Text>
+              <TouchableOpacity style={styles.logoutBtn} onPress={() => {
+                logout();
+                if(onNavigate) onNavigate("auth"); 
+              }}>
+                <Text style={styles.logoutText}>Logout</Text>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
-      )}
 
-      {/* Transactions */}
-      <Text style={styles.title}>Transactions:</Text>
+            {user.role === "farmer" && (
+              <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddForm(!showAddForm)}>
+                <Text style={styles.addBtnText}>{showAddForm ? "Cancel" : "+ Add Product"}</Text>
+              </TouchableOpacity>
+            )}
 
-      {loading ? (
-        <ActivityIndicator size="large" color="green" />
-      ) : transactions.length === 0 ? (
-        <Text style={styles.noData}>No transactions found.</Text>
-      ) : (
-        <FlatList
-          data={transactions}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <View style={styles.item}>
-              <Text style={styles.productText}>Product: {item.product?.name ?? "Unknown"}</Text>
-              <Text>Quantity: {item.quantity ?? 0}</Text>
-              <Text>Total: {item.totalAmount ?? 0} ETB</Text>
-              <Text style={styles.status}>
-                Status: {user.role === "client" ? "Bought" : "Sold"}
-              </Text>
+            {showAddForm && user.role === "farmer" && (
+              <View style={styles.form}>
+                <TextInput style={styles.input} placeholder="Product Name" value={name} onChangeText={setName} />
+                <TextInput style={styles.input} placeholder="Description" value={description} onChangeText={setDescription} />
+                <TextInput style={styles.input} placeholder="Quantity" value={quantity} onChangeText={setQuantity} keyboardType="numeric" />
+                <TextInput style={styles.input} placeholder="Price (ETB)" value={price} onChangeText={setPrice} keyboardType="numeric" />
 
-              {user.role === "client" && !item.status && (
-                <TouchableOpacity style={styles.buyBtn} onPress={() => handleBuyProduct(item.product?._id)}>
-                  <Text style={styles.buyText}>Buy</Text>
+                <View style={styles.pickerContainer}>
+                  <Picker selectedValue={category} onValueChange={setCategory}>
+                    <Picker.Item label="Select Category" value="" />
+                    {categories.map((cat) => <Picker.Item key={cat._id} label={cat.name} value={cat._id} />)}
+                  </Picker>
+                </View>
+
+                <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
+                  <Text style={styles.imageBtnText}>{image ? "Change Image" : "Pick Image"}</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          )}
-        />
-      )}
-    </ScrollView>
+
+                {image && <Text>Image selected</Text>}
+
+                <TouchableOpacity style={styles.submitBtn} onPress={handleAddProduct}>
+                  <Text style={styles.submitBtnText}>Add Product</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <Text style={styles.title}>Transactions:</Text>
+          </>
+        }
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#f0fdf4" },
-  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20 },
+  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 20, paddingHorizontal: 20 },
   welcome: { fontSize: 20, fontWeight: "bold", color: "#16a34a" },
   logoutBtn: { padding: 8 },
   logoutText: { color: "red", fontWeight: "bold" },
-  addBtn: { backgroundColor: "green", padding: 12, borderRadius: 8, marginBottom: 12, alignItems: "center" },
+  addBtn: { backgroundColor: "green", padding: 12, borderRadius: 8, marginBottom: 12, alignItems: "center", marginHorizontal: 20 },
   addBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-  form: { marginBottom: 20, padding: 10, borderWidth: 1, borderColor: "#ccc", borderRadius: 8 },
+  form: { marginBottom: 20, padding: 10, borderWidth: 1, borderColor: "#ccc", borderRadius: 8, marginHorizontal: 20 },
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 10, marginBottom: 12 },
   pickerContainer: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, marginBottom: 12 },
   imageBtn: { backgroundColor: "orange", padding: 10, borderRadius: 8, alignItems: "center", marginBottom: 12 },
   imageBtnText: { color: "#fff", fontWeight: "bold" },
   submitBtn: { backgroundColor: "blue", padding: 12, borderRadius: 8, alignItems: "center" },
   submitBtnText: { color: "#fff", fontWeight: "bold" },
-  title: { fontSize: 18, fontWeight: "bold", marginBottom: 10, color: "#16a34a" },
+  title: { fontSize: 18, fontWeight: "bold", marginBottom: 10, color: "#16a34a", marginHorizontal: 20 },
   noData: { textAlign: "center", marginTop: 20, fontSize: 16, color: "#555" },
-  item: { padding: 12, borderWidth: 1, borderColor: "#ccc", borderRadius: 8, marginBottom: 10, backgroundColor: "#fff" },
+  item: { padding: 12, borderWidth: 1, borderColor: "#ccc", borderRadius: 8, marginBottom: 10, backgroundColor: "#fff", marginHorizontal: 20 },
   productText: { fontWeight: "bold", color: "#16a34a", marginBottom: 4 },
   status: { marginTop: 4, fontWeight: "600", color: "#15803d" },
-  buyBtn: { backgroundColor: "#16a34a", padding: 8, borderRadius: 8, marginTop: 6, alignItems: "center" },
-  buyText: { color: "#fff", fontWeight: "bold" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  messageContainer: { paddingHorizontal: 20, marginBottom: 10 },
+  message: { padding: 10, borderRadius: 8, marginBottom: 5 },
+  messageText: { color: "#fff", fontWeight: "bold" },
 });
 
 export default DashboardScreen;

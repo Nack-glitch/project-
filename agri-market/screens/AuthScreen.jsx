@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import {
   View,
@@ -15,6 +14,7 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 
 const API_URL = "http://192.168.8.123:5000/api"; 
+
 export default function AuthScreen({ onNavigate, onClose }) {
   const { login } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
@@ -26,7 +26,6 @@ export default function AuthScreen({ onNavigate, onClose }) {
     password: "",
     confirmPassword: "",
     role: "client",
-    farmName: "",
     location: "",
   });
 
@@ -43,24 +42,26 @@ export default function AuthScreen({ onNavigate, onClose }) {
       if (onNavigate) onNavigate("dashboard");
       if (onClose) onClose();
     } catch (err) {
-      console.error(err);
-      Alert.alert("Login Failed", err.response?.data?.message || "Error");
+      const message =
+        err.response?.data?.message || 
+        err.message || 
+        "Login failed. Please try again.";
+      Alert.alert("Login Failed", message);
     }
   };
 
   const handleRegister = async () => {
-    let { name, phoneNumber, password, confirmPassword, role, farmName, location } = registerData;
+    let { name, phoneNumber, password, confirmPassword, role, location } = registerData;
 
     name = name?.trim();
     phoneNumber = phoneNumber?.trim();
     password = password?.trim();
     confirmPassword = confirmPassword?.trim();
-    farmName = farmName?.trim();
     location = location?.trim();
 
     if (!name || !phoneNumber || !password) return Alert.alert("Error", "Please fill all required fields");
     if (password !== confirmPassword) return Alert.alert("Error", "Passwords do not match");
-    if (role === "farmer" && (!farmName || !location)) return Alert.alert("Error", "Please provide farm details");
+    if (role === "farmer" && !location) return Alert.alert("Error", "Please provide location");
 
     try {
       const res = await axios.post(`${API_URL}/auth/register`, registerData);
@@ -71,23 +72,35 @@ export default function AuthScreen({ onNavigate, onClose }) {
       if (onNavigate) onNavigate("dashboard");
       if (onClose) onClose();
     } catch (err) {
-      console.error(err);
-      Alert.alert("Register Failed", err.response?.data?.message || "Error");
+      const message =
+        err.response?.data?.message || 
+        err.message || 
+        "Registration failed. Please try again.";
+      Alert.alert("Register Failed", message);
     }
   };
 
   return (
-    <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView
+      style={styles.overlay}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>AgriMarket 🌱</Text>
         </View>
 
         <View style={styles.tabContainer}>
-          <TouchableOpacity style={[styles.tab, isLogin && styles.activeTab]} onPress={() => setIsLogin(true)}>
+          <TouchableOpacity
+            style={[styles.tab, isLogin && styles.activeTab]}
+            onPress={() => setIsLogin(true)}
+          >
             <Text style={isLogin ? styles.activeTabText : styles.tabText}>Login</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, !isLogin && styles.activeTab]} onPress={() => setIsLogin(false)}>
+          <TouchableOpacity
+            style={[styles.tab, !isLogin && styles.activeTab]}
+            onPress={() => setIsLogin(false)}
+          >
             <Text style={!isLogin ? styles.activeTabText : styles.tabText}>Sign Up</Text>
           </TouchableOpacity>
         </View>
@@ -152,20 +165,12 @@ export default function AuthScreen({ onNavigate, onClose }) {
                 keyboardType="phone-pad"
               />
               {registerData.role === "farmer" && (
-                <>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Farm Name"
-                    value={registerData.farmName}
-                    onChangeText={(v) => setRegisterData({ ...registerData, farmName: v })}
-                  />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Location"
-                    value={registerData.location}
-                    onChangeText={(v) => setRegisterData({ ...registerData, location: v })}
-                  />
-                </>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Location"
+                  value={registerData.location}
+                  onChangeText={(v) => setRegisterData({ ...registerData, location: v })}
+                />
               )}
               <TextInput
                 style={styles.input}
@@ -186,6 +191,16 @@ export default function AuthScreen({ onNavigate, onClose }) {
               </TouchableOpacity>
             </View>
           )}
+
+          <TouchableOpacity
+            style={[styles.backButton, { alignSelf: "center", marginTop: 20 }]}
+            onPress={() => {
+              if (onClose) onClose();      
+              if (onNavigate) onNavigate("home"); 
+            }}
+          >
+            <Text style={styles.backButtonText}>Back to Home</Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
@@ -209,6 +224,6 @@ const styles = StyleSheet.create({
   userTypeActive: { backgroundColor: "green", borderColor: "green" },
   userTypeText: { color: "gray", fontWeight: "500" },
   userTypeTextActive: { color: "white", fontWeight: "bold" },
-  backButton: { marginBottom: 12 },
+  backButton: { padding: 10 },
   backButtonText: { color: "green", fontWeight: "bold" },
 });

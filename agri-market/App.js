@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   StyleSheet,
   Modal,
@@ -31,15 +29,13 @@ function AppContent() {
   const [isSplashVisible, setSplashVisible] = useState(true);
 
   useEffect(() => {
-
     const timer = setTimeout(() => setSplashVisible(false), 2000);
     return () => clearTimeout(timer);
   }, []);
 
   const handleViewChange = (view) => {
-    if (view === "auth") {
-      setShowAuthModal(true);
-    } else {
+    if (view === "auth") setShowAuthModal(true);
+    else {
       setCurrentView(view);
       setShowAuthModal(false);
     }
@@ -63,9 +59,7 @@ function AppContent() {
     }
   };
 
-  if (isSplashVisible) {
-    return <SplashScreen onFinish={() => setSplashVisible(false)} />;
-  }
+  if (isSplashVisible) return <SplashScreen onFinish={() => setSplashVisible(false)} />;
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={["top", "left", "right"]}>
@@ -91,8 +85,10 @@ function AppContent() {
         )}
       </View>
 
-      <ScrollView style={{ flex: 1 }}>{renderCurrentView()}</ScrollView>
+      {/* Main content without ScrollView to avoid nested FlatList issue */}
+      <View style={{ flex: 1 }}>{renderCurrentView()}</View>
 
+      {/* Bottom navigation */}
       <SafeAreaView edges={["bottom"]} style={styles.bottomNav}>
         <TouchableOpacity
           style={[styles.navButton, currentView === "home" && styles.navButtonActive]}
@@ -118,7 +114,8 @@ function AppContent() {
           <Text style={styles.navLabel}>{user ? "Dashboard" : "Profile"}</Text>
         </TouchableOpacity>
       </SafeAreaView>
-      
+
+      {/* Auth Modal */}
       <Modal visible={showAuthModal} animationType="slide" transparent>
         <AuthScreen
           onClose={() => setShowAuthModal(false)}

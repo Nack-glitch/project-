@@ -30,7 +30,7 @@ const HomeScreen = ({ onNavigate }) => {
 
         <View style={styles.heroButtons}>
           <TouchableOpacity style={styles.getStartedBtn} onPress={handleGetStarted}>
-            <Text style={styles.btnText}>Get Started →</Text>
+            <Text style={styles.btnText}>Get Started </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.exploreBtn} onPress={handleExploreProducts}>
             <Text style={styles.exploreText}>Explore Products</Text>
@@ -111,7 +111,7 @@ const HomeScreen = ({ onNavigate }) => {
         </View>
 
         <TouchableOpacity style={styles.exploreAllBtn} onPress={handleExploreProducts}>
-          <Text style={styles.btnText}>View All Products →</Text>
+          <Text style={styles.btnText}>View All Products </Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
